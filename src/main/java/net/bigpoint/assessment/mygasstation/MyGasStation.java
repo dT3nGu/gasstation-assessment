@@ -37,7 +37,7 @@ public class MyGasStation implements GasStation {
 	
 	public synchronized Collection<GasPump> getGasPumps() {
 		ArrayList<GasPump> pumps = new ArrayList<GasPump>();
-		// Create identical copies of the existing pumps
+		// Create identical copies of the existing pumps to prevent modification 
 		for (GasPump pump : gasPumps) {
 			GasPump newPump = new GasPump(pump.getGasType(), pump.getRemainingAmount());
 			pumps.add(newPump);
