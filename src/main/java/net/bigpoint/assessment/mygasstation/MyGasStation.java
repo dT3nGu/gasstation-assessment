@@ -36,7 +36,13 @@ public class MyGasStation implements GasStation {
 	}
 	
 	public synchronized Collection<GasPump> getGasPumps() {
-		return new ArrayList<GasPump>(gasPumps);
+		ArrayList<GasPump> pumps = new ArrayList<GasPump>();
+		// Create identical copies of the existing pumps
+		for (GasPump pump : gasPumps) {
+			GasPump newPump = new GasPump(pump.getGasType(), pump.getRemainingAmount());
+			pumps.add(newPump);
+		}
+		return pumps;
 	}
 	
 	/**
@@ -55,8 +61,10 @@ public class MyGasStation implements GasStation {
 		return false;
 	}
 	
-	public void addGasPump(GasPump pump) {
-		gasPumps.add(pump);		
+	public synchronized void addGasPump(GasPump pump) {
+		gasPumps.add(pump);
+		// Notify all Threads in case one is waiting for a pump of that type
+		notifyAll();
 	}
 	
 	/**
@@ -99,16 +107,19 @@ public class MyGasStation implements GasStation {
 		
 		return chosenPump;
 	}
+	
+	private void checkTooExpensive(GasType type, double amountInLiters, double maxPricePerLiter) throws GasTooExpensiveException {
+		if (Double.compare(maxPricePerLiter, pricePerType.get(type)) < 0) {
+			++numberOfCancellationsTooExpensive;
+			throw new GasTooExpensiveException();			
+		}
+	}
 
 	public double buyGas(GasType type, double amountInLiters, double maxPricePerLiter)
 			throws NotEnoughGasException, GasTooExpensiveException {
-		
-		// Test if price is not too expensive
-		if (Double.compare(maxPricePerLiter, pricePerType.get(type)) < 0) {
-			synchronized (this) {
-				++numberOfCancellationsTooExpensive;
-			}
-			throw new GasTooExpensiveException();			
+		// pre-check if it's too expensive
+		synchronized (this) {
+			checkTooExpensive(type, amountInLiters, maxPricePerLiter);
 		}
 		
 		// Loop to wait for an available pump
@@ -128,15 +139,21 @@ public class MyGasStation implements GasStation {
 					}			
 				}
 			} else {
-				// Pump gas as soon as it is your turn
-				pump.pumpGas(amountInLiters);
+				// Book price and amount before pumping
 				double price = 0;
 				synchronized (this) {
-					// on finish, free occupied pump
-					occupiedPumps.remove(pump);
+					//Check again if it's still not too expensive
+					checkTooExpensive(type, amountInLiters, maxPricePerLiter);
+					// charge guaranteed price
 					price = amountInLiters * pricePerType.get(type);
 					revenue += price;
 					++numberOfSales;
+				}
+				// Pump gas as soon as it is your turn
+				pump.pumpGas(amountInLiters);
+				synchronized (this) {
+					// on finish, free occupied pump
+					occupiedPumps.remove(pump);
 					notifyAll();
 				}
 				return price;
