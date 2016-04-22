@@ -53,7 +53,7 @@ public class GasStationTest  {
     	station.setPrice(GasType.REGULAR, prices[GasType.REGULAR.ordinal()]);
     	station.addGasPump(new GasPump(GasType.DIESEL, 105.0));
     	station.addGasPump(new GasPump(GasType.DIESEL, 125.0));
-    	station.addGasPump(new GasPump(GasType.DIESEL, 55.0));
+    	station.addGasPump(new GasPump(GasType.DIESEL, 100.0));
     	station.addGasPump(new GasPump(GasType.SUPER, 135.0));
     	station.addGasPump(new GasPump(GasType.SUPER, 115.0));
     	station.addGasPump(new GasPump(GasType.REGULAR, 125.0));
@@ -71,6 +71,11 @@ public class GasStationTest  {
     }
     
     private void startThread(final double amount, final double priceMax, final GasType type, final GasStation station) {
+//    	try {
+//			Thread.sleep(1);
+//		} catch (InterruptedException e1) {
+//			
+//		}
     	( new Thread() {public void run() { 
     			try {
 					station.buyGas(type, amount, priceMax);
@@ -134,20 +139,6 @@ public class GasStationTest  {
     	totalRevenue += station.getPrice(type) * amount;
     	++numberOfSales;    	
     }
-    
-    @Test
-    public final void testExceptions() throws Exception {
-    	// Test Exceptions
-    	GasStation station = setupSmallStation();
-    	testTooExpensive(50, 0.97, GasType.DIESEL, station);
-    	testTooExpensive(50, 1.20, GasType.SUPER, station);  
-    	testTooExpensive(50, 1.14, GasType.REGULAR, station);
-    	testNotEnoughGas(500, 0.99, GasType.DIESEL, station);
-    	testNotEnoughGas(500, 1.22, GasType.SUPER, station);  
-    	Assert.assertEquals(station.getNumberOfCancellationsTooExpensive(), 3);
-    	pumpGas(10,  1.16, GasType.REGULAR, station);
-    	testNotEnoughGas(115.1, 1.16, GasType.REGULAR, station);
-    }
 
     @Test
     public final void testTiming() throws Exception {
@@ -170,7 +161,7 @@ public class GasStationTest  {
     	Assert.assertEquals(TimeUnit.NANOSECONDS.toMillis(afterTime - beforeTime), 30 * 100, 10.0);
 
     	// Wait for queues to finish
-    	Thread.sleep(3000);
+    	//Thread.sleep(3000);
     	
     	beforeTime = System.nanoTime();
     	startThread(10, 2, GasType.REGULAR, station);
@@ -183,28 +174,29 @@ public class GasStationTest  {
     	Assert.assertEquals(TimeUnit.NANOSECONDS.toMillis(afterTime - beforeTime), 46 * 100, 10.0);
 
     	// Wait for queues to finish
-    	Thread.sleep(3000);
+    	//Thread.sleep(3000);
     	
     	beforeTime = System.nanoTime();
     	startThread(30, 2, GasType.SUPER, station);
     	startThread(20, 2, GasType.SUPER, station);
     	startThread(20, 2, GasType.SUPER, station);
     	startThread(10, 2, GasType.REGULAR, station);
+    	startThread(40, 2, GasType.DIESEL, station);
     	startThread(30, 2, GasType.DIESEL, station);
     	startThread(20, 2, GasType.DIESEL, station);
-    	startThread(10, 2, GasType.DIESEL, station);
+    	startThread(40, 2, GasType.DIESEL, station);
     	startThread(30, 2, GasType.DIESEL, station);
     	startThread(20, 2, GasType.DIESEL, station);
-    	startThread(10, 2, GasType.DIESEL, station);
     	Thread.sleep(100);
     	pumpGas(10, 2, GasType.REGULAR, station); // Wait 10 + 10 (self) Millisecs
-    	pumpGas(10, 2, GasType.SUPER, station); // Wait 20 + 10 - 20 (previous) = 10 + 10 (self) Millisecs
-    	pumpGas(10, 2, GasType.DIESEL, station); // Wait 40 - 40 + 10 (self)
+    	pumpGas(10, 2, GasType.SUPER, station); // Wait 30 - 20 (previous) = 10 + 10 (self) Millisecs
+    	pumpGas(10, 2, GasType.DIESEL, station); // Wait 60 - 40 (previous) + 10 (self) 
+    	// total 70 
     	afterTime = System.nanoTime();
     	System.out.println("Timing: "+TimeUnit.NANOSECONDS.toMillis(afterTime - beforeTime));
-    	Assert.assertTrue(TimeUnit.NANOSECONDS.toMillis(afterTime - beforeTime) > 4995 && TimeUnit.NANOSECONDS.toMillis(afterTime - beforeTime) < 6005);
+    	Assert.assertEquals(7000, TimeUnit.NANOSECONDS.toMillis(afterTime - beforeTime), 10);
     	
-    	Thread.sleep(3000);
+    	//Thread.sleep(3000);
     	// Test if at the end, the expected number of sales and total revenue is available
     	
     	Assert.assertEquals(station.getNumberOfSales(), numberOfSales);
@@ -212,6 +204,20 @@ public class GasStationTest  {
     	
     	// Test if there's not more than 100 liters of Diesel available
     	testThreadedNotEnoughGas(100, 2, GasType.DIESEL, station);
+    }
+    
+    @Test
+    public final void testExceptions() throws Exception {
+    	// Test Exceptions
+    	GasStation station = setupSmallStation();
+    	testTooExpensive(50, 0.97, GasType.DIESEL, station);
+    	testTooExpensive(50, 1.20, GasType.SUPER, station);  
+    	testTooExpensive(50, 1.14, GasType.REGULAR, station);
+    	testNotEnoughGas(500, 0.99, GasType.DIESEL, station);
+    	testNotEnoughGas(500, 1.22, GasType.SUPER, station);  
+    	Assert.assertEquals(station.getNumberOfCancellationsTooExpensive(), 3);
+    	pumpGas(10,  1.16, GasType.REGULAR, station);
+    	testNotEnoughGas(115.1, 1.16, GasType.REGULAR, station);
     }
     
     @Test
@@ -263,10 +269,11 @@ public class GasStationTest  {
     	startThread(50, 1.15, GasType.REGULAR, station);
     	startThread(50, 1.15, GasType.REGULAR, station);
     	Thread.sleep(10);
+    	// Add Pump mid pumping
     	station.addGasPump(new GasPump(GasType.REGULAR, 50));
+    	Thread.sleep(10);
     	pumpGas(10, 1.15, GasType.REGULAR, station);
     	long afterTime = System.nanoTime();
     	Assert.assertEquals(60 * 100, TimeUnit.NANOSECONDS.toMillis(afterTime - beforeTime), 10.0);
-    	
     }
 }
